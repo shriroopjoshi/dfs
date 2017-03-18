@@ -16,6 +16,7 @@ public class Main {
 		}
 		Properties configs = Commons.loadProperties(filename);
 		Constants.CONNECTIONS_PATH = configs.getProperty("connections.path");
+		Constants.REPOSITORY_PATH = configs.getProperty("repository.path");
 		// Commons.clearConnections();
 		Constants.CLIENT_NUMBER = Integer.parseInt(configs.getProperty("client.number", "5"));
 		int id = Integer.parseInt(args[1]);
