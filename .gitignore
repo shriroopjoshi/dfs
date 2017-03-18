@@ -2,4 +2,6 @@
 .settings/
 .lib/*
 .project
-resources/connections/client0 resources/connections/client1 resources/connections/client2 resources/connections/client3 resources/connections/client4
+resources/connections/*
+build/
+classes/

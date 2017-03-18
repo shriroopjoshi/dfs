@@ -19,13 +19,14 @@ import messages.ReadMessage;
 import messages.UpdateMessage;
 import utils.Commons;
 import utils.Constants;
+import utils.MessageContainer;
 
 public class Server {
 
 	ServerSocket server;
 	private int id;
-	LinkedBlockingQueue<Message> inQueue;
-	LinkedBlockingQueue<Message> outQueue;
+	LinkedBlockingQueue<MessageContainer> inQueue;
+	LinkedBlockingQueue<MessageContainer> outQueue;
 
 	public Server(int id, int port) throws IOException {
 		this.id = id;
@@ -34,7 +35,7 @@ public class Server {
 		outQueue = new LinkedBlockingQueue<>();
 	}
 
-	public void start() throws IOException {
+	public void start() throws IOException, InterruptedException {
 		// TODO Auto-generated method stub
 		Commons.log("Server started", id, true);
 		String address = InetAddress.getLocalHost().getHostAddress();
@@ -42,8 +43,23 @@ public class Server {
 		Thread receiverThread = new Thread(new ReceiverThread());
 		receiverThread.setName("ReceiverThread");
 		receiverThread.start();
+		Thread senderThread = new Thread(new SenderThread());
+		senderThread.setName("SenderThread");
+		senderThread.start();
 		while(true) {
-			
+			MessageContainer container = inQueue.take();
+			Message msg = container.getMessage();
+			if(msg instanceof ReadMessage) {
+				
+			} else if(msg instanceof InsertMessage) {
+				
+			} else if(msg instanceof UpdateMessage) {
+				
+			} else if(msg instanceof DeleteMessage) {
+				
+			} else {
+				System.err.println("[ SERVER- " + id + "]: ERROR - Unknown Message received");
+			}
 		}
 	}
 
@@ -81,16 +97,16 @@ public class Server {
 					String rawMessage = br.readLine();
 					if(rawMessage.contains("ReadMessage")) {
 						ReadMessage rm = ReadMessage.getObjectFromString(rawMessage);
-						inQueue.put(rm);
+						inQueue.put(new MessageContainer(rm, client));
 					} else if(rawMessage.contains("InsertMessage")) {
 						InsertMessage im = InsertMessage.getObjectFromString(rawMessage);
-						inQueue.put(im);
+						inQueue.put(new MessageContainer(im, client));
 					} else if(rawMessage.contains("UpdateMessage")) {
 						UpdateMessage um = UpdateMessage.getObjectFromString(rawMessage);
-						inQueue.put(um);
+						inQueue.put(new MessageContainer(um, client));
 					} else if(rawMessage.contains("DeleteMessage")) {
 						DeleteMessage dm = DeleteMessage.getObjectFromString(rawMessage);
-						inQueue.put(dm);
+						inQueue.put(new MessageContainer(dm, client));
 					} else {
 						System.err.println("[ SERVER- " + id + "]: ERROR - Unknown Message received");
 					}
@@ -108,9 +124,9 @@ public class Server {
 			// TODO Auto-generated method stub
 			while(true) {
 				try {
-					Message msg = outQueue.take();
-					
-				} catch (InterruptedException e) {
+					MessageContainer container = outQueue.take();
+					Commons.writeToSocket(container.getClient(), container.getMessage().toString());
+				} catch (InterruptedException | IOException e) {
 					e.printStackTrace();
 				}
 			}

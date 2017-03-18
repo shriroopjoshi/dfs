@@ -9,7 +9,7 @@ import utils.Constants;
 
 public class Main {
 
-	public static void main(String[] args) throws IOException, NumberFormatException {
+	public static void main(String[] args) throws IOException, NumberFormatException, InterruptedException {
 		String filename = "resources/config.properties";
 		if(args.length != 2) {
 			usage();
