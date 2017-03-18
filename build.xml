@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="main" name="dfs">
+    <property name="src.dir" value="src/" />
+    <property name="build.dir" value="build/" />
+    <property name="classes.dir" value="classes/" />
+    <property name="mainclass" value="app.Main" />
+    <path id="dfs.classpath">
+        <fileset dir="./lib/">
+		<include name="*.jar" />
+	</fileset>
+    </path>
+    <target name="clean">
+    	<delete dir="${classes.dir}" />
+	<delete dir="${build.dir}" />
+    </target>
+    <target name="compile">
+    	<mkdir dir="${classes.dir}" />
+	<javac srcdir="${src.dir}" destdir="${classes.dir}" includeantruntime="false"  debug="true">
+		<classpath refid="dfs.classpath" />
+	</javac>
+    </target>
+    <target name="build">
+    	<mkdir dir="${build.dir}" />
+	<jar destfile="${build.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
+	    <zipgroupfileset dir="./lib/" includes="*.jar" />	
+	    <manifest>
+		<attribute name="Main-Class" value="${mainclass}" />
+		<attribute name="Class-path" value="." />
+	    </manifest>
+	</jar>
+    </target>
+    <target name="main" depends="clean,compile,build" />
+</project>
