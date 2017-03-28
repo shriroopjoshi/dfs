@@ -8,7 +8,7 @@ public class RepoObject {
 	private static int ID_GEN = 0;
 	
 	private int id;
-	private String contents;
+	public String contents;
 
 	public int getId() {
 		return id;

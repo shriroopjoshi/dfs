@@ -3,6 +3,7 @@ package utils;
 public class Constants {
 	
 	public static int SERVER_PORT;
+	public static int SERVER_NUMBER;
 
 	public static String CONNECTIONS_PATH;
 	public static String REPOSITORY_PATH;

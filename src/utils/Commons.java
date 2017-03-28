@@ -1,10 +1,12 @@
 package utils;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.util.Properties;
@@ -51,5 +53,10 @@ public class Commons {
     	OutputStreamWriter osw = new OutputStreamWriter(s.getOutputStream(), "UTF-8");
         osw.append(message).append("\n");
         osw.flush();
+    }
+    
+    public static String readFromSocket(Socket s) throws IOException {
+    	BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
+    	return br.readLine();
     }
 }

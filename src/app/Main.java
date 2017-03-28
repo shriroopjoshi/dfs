@@ -3,6 +3,7 @@ package app;
 import java.io.IOException;
 import java.util.Properties;
 
+import client.Client;
 import server.Server;
 import utils.Commons;
 import utils.Constants;
@@ -19,6 +20,7 @@ public class Main {
 		Constants.REPOSITORY_PATH = configs.getProperty("repository.path");
 		// Commons.clearConnections();
 		Constants.CLIENT_NUMBER = Integer.parseInt(configs.getProperty("client.number", "5"));
+		Constants.SERVER_NUMBER = Integer.parseInt(configs.getProperty("server.number", "7"));
 		int id = Integer.parseInt(args[1]);
 		int acceptedServerId = Integer.parseInt(configs.getProperty("server.number", "7")) - 1;
 		int acceptedClientId = Integer.parseInt(configs.getProperty("client.number", "5")) - 1;
@@ -34,7 +36,8 @@ public class Main {
 			}
 		} else if(args[0].equalsIgnoreCase("client")) {
 			if(id <= acceptedClientId) {
-				System.out.println("Client");
+				Client client = new Client(id);
+				client.start();
 			} else {
 				System.err.println("<id> should be in the range [0-" + acceptedClientId + "]");
 				System.exit(1);

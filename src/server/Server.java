@@ -47,7 +47,7 @@ public class Server {
 
 	public void start() throws IOException, InterruptedException {
 		// TODO Auto-generated method stub
-		Commons.log("Server started", id, true);
+		Commons.log("Server started on " + InetAddress.getLocalHost().getHostAddress() + ":" + Constants.SERVER_PORT, id, true);
 		String address = InetAddress.getLocalHost().getHostAddress();
 		addToConnectionList(address, Constants.CONNECTIONS_PATH);
 		Thread receiverThread = new Thread(new ReceiverThread());
@@ -261,6 +261,7 @@ public class Server {
 		public void run() {
 			while (true) {
 				try {
+					Commons.log("Waiting for connections", id, true);
 					Socket client = server.accept();
 					BufferedReader br = new BufferedReader(new InputStreamReader(client.getInputStream()));
 					String rawMessage = br.readLine();
