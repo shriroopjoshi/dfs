@@ -13,4 +13,7 @@ public class ResponseMessage extends Message {
 		Gson gson = new GsonBuilder().setLenient().create();
 		return gson.fromJson(object, ResponseMessage.class);
 	}
+	
+	@SuppressWarnings("unused")
+	private String type = "ResponseMessage";
 }

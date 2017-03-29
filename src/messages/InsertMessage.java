@@ -11,4 +11,7 @@ public class InsertMessage extends Message {
 		Gson gson = new GsonBuilder().setLenient().create();
 		return gson.fromJson(object, InsertMessage.class);
 	}
+	
+	@SuppressWarnings("unused")
+	private String type = "InsertMessage";
 }

@@ -11,4 +11,7 @@ public class UpdateMessage extends Message {
 		Gson gson = new GsonBuilder().setLenient().create();
 		return gson.fromJson(object, UpdateMessage.class);
 	}
+	
+	@SuppressWarnings("unused")
+	private String type = "UpdateMessage";
 }

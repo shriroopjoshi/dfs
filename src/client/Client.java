@@ -1,10 +1,11 @@
 package client;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Properties;
-import java.util.Scanner;
 
 import messages.DeleteMessage;
 import messages.InsertMessage;
@@ -26,12 +27,12 @@ public class Client {
 
 	public void start() throws IOException {
 		Commons.log("Client started", id, false);
-		Scanner sc = new Scanner(System.in);
+		//Scanner sc = new Scanner(System.in);
 		while (true) {
 			console();
-			switch (sc.nextLine().charAt(0)) {
+			switch (readConsole().charAt(0)) {
 			case 'q':
-				sc.close();
+				// sc.close();
 				Commons.log("Exiting", id, false);
 				System.exit(0);
 				break;
@@ -39,7 +40,7 @@ public class Client {
 			case 'i':
 				// TODO
 				console("objectID: ");
-				int objectID = sc.nextInt();
+				int objectID = readConsoleInt();
 				int h = hash(objectID);
 				boolean conn1 = checkConn(hash(h));
 				boolean conn2 = checkConn(hash(h + 1));
@@ -54,7 +55,8 @@ public class Client {
 					im.objectID = objectID;
 					console("Contents: ");
 					RepoObject obj = new RepoObject();
-					obj.contents = sc.nextLine();
+					obj.contents = readConsole();
+					Commons.log("Contemts: " + obj.toString(), id, false);
 					im.object = obj.toString();
 					Commons.writeToSocket(server1, im.toString());
 					Commons.writeToSocket(server2, im.toString());
@@ -78,7 +80,7 @@ public class Client {
 			case 'u':
 				// TODO
 				console("objectID: ");
-				objectID = sc.nextInt();
+				objectID = readConsoleInt();
 				h = hash(objectID);
 				conn1 = checkConn(hash(h));
 				conn2 = checkConn(hash(h + 1));
@@ -121,7 +123,7 @@ public class Client {
 					um.setObjectID(objectID);
 					console("Contents: ");
 					RepoObject obj = new RepoObject();
-					obj.contents = sc.nextLine();
+					obj.contents = readConsole();
 					um.newObject = obj.toString();
 					um.sender = "CLIENT-" + id;
 					um.senderAddress = InetAddress.getLocalHost().getHostAddress();
@@ -151,7 +153,7 @@ public class Client {
 				
 			case 'r':
 				console("objectID: ");
-				objectID = sc.nextInt();
+				objectID = readConsoleInt();
 				h = hash(objectID);
 				conn1 = checkConn(hash(h));
 				conn2 = checkConn(hash(h + 1));
@@ -159,7 +161,7 @@ public class Client {
 				console("Servers: " + hash(h) + (conn1 ? "*" : "") + ", "
 						+ hash(h + 1) + (conn2 ? "*" : "") + ", "
 						+ hash(h + 2) + (conn3 ? "*" : ""));
-				int serverID = sc.nextInt();
+				int serverID = readConsoleInt();
 				String serverAddress = connect(serverID);
 				if(serverAddress == null) {
 					Commons.log("Unable to reach SERVER-" + serverID, id, false);
@@ -182,9 +184,9 @@ public class Client {
 				
 			case 'd':
 				console("objectID: ");
-				objectID = sc.nextInt();
+				objectID = readConsoleInt();
 				console("objectID (confirmation): ");
-				int tempID = sc.nextInt();
+				int tempID = readConsoleInt();
 				if(objectID != tempID)
 					break;
 				h = hash(objectID);
@@ -242,5 +244,15 @@ public class Client {
 	
 	private void console() {
 		System.out.print("client> ");
+	}
+	
+	private String readConsole() throws IOException {
+		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+		return br.readLine();
+	}
+	
+	private int readConsoleInt() throws IOException {
+		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+		return Integer.parseInt(br.readLine());
 	}
 }

@@ -36,6 +36,8 @@ public class Main {
 			}
 		} else if(args[0].equalsIgnoreCase("client")) {
 			if(id <= acceptedClientId) {
+				Constants.SERVER_PORT = Integer.parseInt(configs.getProperty("server.port", "8090"));
+				Commons.log("PORT: " + Constants.SERVER_PORT, id, false);
 				Client client = new Client(id);
 				client.start();
 			} else {

@@ -9,4 +9,7 @@ public class ReadMessage extends Message {
 		Gson gson = new GsonBuilder().setLenient().create();
 		return gson.fromJson(object, ReadMessage.class);
 	}
+	
+	@SuppressWarnings("unused")
+	private String type = "ReadMessage";
 }

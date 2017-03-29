@@ -40,6 +40,7 @@ public class Server {
 		inQueue = new LinkedBlockingQueue<>();
 		outQueue = new LinkedBlockingQueue<>();
 		repo = new File(Constants.REPOSITORY_PATH + "server" + id);
+		Commons.log("RepoPath: " + repo, id, true);
 		if(!repo.exists()) {
 			repo.mkdirs();
 		}
@@ -159,7 +160,7 @@ public class Server {
 				outQueue.put(resContainer);
 				
 			} else {
-				System.err.println("[ SERVER- " + id + "]: ERROR - Unknown Message received");
+				System.err.println("[ SERVER-" + id + "]: ERROR - Unknown Message received");
 			}
 		}
 	}
@@ -192,8 +193,8 @@ public class Server {
 		}
 		if(obj == null)
 			return updated;
-		OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(repo.getPath() + File.pathSeparator + msg.getObjectID()));
-		osw.write(msg.newObject);
+		OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(repo.getPath() + File.separator + msg.getObjectID()));
+		osw.write(msg.newObject + "\n");
 		osw.close();
 		return updated;
 	}
@@ -207,8 +208,8 @@ public class Server {
 		}
 		File f = new File(repo.getPath() + File.separator + msg.getObjectID());
 		f.createNewFile();
-		OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(repo.getPath() + File.pathSeparator + msg.getObjectID()));
-		osw.write(msg.object);
+		OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(f));
+		osw.write(msg.object + "\n");
 		osw.close();
 		inserted = true;
 		return inserted;
@@ -265,6 +266,7 @@ public class Server {
 					Socket client = server.accept();
 					BufferedReader br = new BufferedReader(new InputStreamReader(client.getInputStream()));
 					String rawMessage = br.readLine();
+					Commons.log("MESSAGE: " + rawMessage, id, true);
 					if(rawMessage.contains("ReadMessage")) {
 						ReadMessage rm = ReadMessage.getObjectFromString(rawMessage);
 						inQueue.put(new MessageContainer(rm, client));
