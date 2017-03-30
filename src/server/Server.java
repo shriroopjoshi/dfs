@@ -18,6 +18,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import messages.DeleteMessage;
 import messages.InsertMessage;
 import messages.Message;
+import messages.ProbeMessage;
 import messages.ReadMessage;
 import messages.ResponseMessage;
 import messages.UpdateMessage;
@@ -28,15 +29,16 @@ import utils.MessageContainer;
 
 public class Server {
 
-	ServerSocket server;
+	ServerSocket externalServer, internalServer;
 	private int id;
 	File repo;
 	LinkedBlockingQueue<MessageContainer> inQueue;
 	LinkedBlockingQueue<MessageContainer> outQueue;
 
-	public Server(int id, int port) throws IOException {
+	public Server(int id, int externalPort, int internalPort) throws IOException {
 		this.id = id;
-		server = new ServerSocket(port);
+		externalServer = new ServerSocket(externalPort);
+		internalServer = new ServerSocket(internalPort);
 		inQueue = new LinkedBlockingQueue<>();
 		outQueue = new LinkedBlockingQueue<>();
 		repo = new File(Constants.REPOSITORY_PATH + "server" + id);
@@ -52,6 +54,9 @@ public class Server {
 				id, true);
 		String address = InetAddress.getLocalHost().getHostAddress();
 		addToConnectionList(address, Constants.CONNECTIONS_PATH);
+		Thread serverThread = new Thread(new ServerThread());
+		serverThread.setName("InternalServerThread");
+		serverThread.start();
 		Thread receiverThread = new Thread(new ReceiverThread());
 		receiverThread.setName("ReceiverThread");
 		receiverThread.start();
@@ -214,6 +219,9 @@ public class Server {
 		File f = new File(repo.getPath() + File.separator + msg.getObjectID());
 		f.createNewFile();
 		OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(f));
+		RepoObject o = RepoObject.getObjectFromString(msg.object);
+		o.version = 0;
+		msg.object = o.toString();
 		osw.write(msg.object + "\n");
 		osw.close();
 		inserted = true;
@@ -255,7 +263,7 @@ public class Server {
 			props.store(out, null);
 			out.close();
 			props = new Properties();
-			if(!serverFile.exists()) {
+			if (!serverFile.exists()) {
 				serverFile.createNewFile();
 			} else {
 				FileInputStream in = new FileInputStream(serverFile);
@@ -276,7 +284,7 @@ public class Server {
 			while (true) {
 				try {
 					Commons.log("Waiting for connections", id, true);
-					Socket client = server.accept();
+					Socket client = externalServer.accept();
 					BufferedReader br = new BufferedReader(new InputStreamReader(client.getInputStream()));
 					String rawMessage = br.readLine();
 					Commons.log("MESSAGE: " + rawMessage, id, true);
@@ -317,4 +325,39 @@ public class Server {
 		}
 	}
 
+	private class ServerThread implements Runnable {
+
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			try {
+				String STATUS = "NOT_FOUND";
+				String contents = "";
+				Socket server = internalServer.accept();
+				String rawMessage = Commons.readFromSocket(server);
+				ProbeMessage pm = ProbeMessage.getObjectFromString(rawMessage);
+				RepoObject obj = RepoObject.getObjectFromString(pm.object);
+				File[] files = repo.listFiles();
+				if (files != null && files.length != 0) {
+					for (File file : files) {
+						if (file.getName().equals(obj.getId() + "")) {
+							STATUS = "FOUND";
+							contents = new String(Files.readAllBytes(file.toPath()));
+							break;
+						}
+					}
+				}
+				if (STATUS.equals("FOUND")) {
+					RepoObject newObj = RepoObject.getObjectFromString(contents);
+					if (newObj.version > obj.version) {
+						pm.object = newObj.toString();
+					}
+				}
+				Commons.writeToSocket(server, pm.toString());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+	}
 }

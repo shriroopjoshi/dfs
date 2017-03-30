@@ -27,7 +27,8 @@ public class Main {
 		if(args[0].equalsIgnoreCase("server")) {
 			if(id <= acceptedServerId) {
 				Constants.SERVER_PORT = Integer.parseInt(configs.getProperty("server.port", "8090"));
-				Server server = new Server(id, Constants.SERVER_PORT);
+				Constants.SERVER_INTERNAL_PORT = Integer.parseInt(configs.getProperty("server.internal.port", "8092"));
+				Server server = new Server(id, Constants.SERVER_PORT, Constants.SERVER_INTERNAL_PORT);
 				server.start();
 				System.out.println("Server");
 			} else {
