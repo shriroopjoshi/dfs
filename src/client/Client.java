@@ -9,22 +9,36 @@ import java.util.ArrayList;
 import java.util.Properties;
 
 import messages.DeleteMessage;
+import messages.FinalMessage;
 import messages.InsertMessage;
 import messages.ReadMessage;
 import messages.ResponseMessage;
 import messages.UpdateMessage;
 import objects.RepoObject;
+import server.STATUS;
 import utils.Commons;
 import utils.Constants;
 
+/**
+ * Creates a client interface for File System
+ * 
+ * @author shriroop
+ *
+ */
 public class Client {
 
+	// CLIENT-ID
 	private int id;
 
 	public Client(int id) {
 		this.id = id;
 	}
 
+	/**
+	 * Starts client interface on an interactive console
+	 * 
+	 * @throws IOException
+	 */
 	public void start() throws IOException {
 		Commons.log("Client started", id, false);
 		while (true) {
@@ -39,14 +53,17 @@ public class Client {
 				System.exit(0);
 				break;
 
+			/*
+			 * INSERT object to the FileSystem
+			 */
 			case 'i':
-				// TODO Implement 2-phase commit
-				// TODO Receiver field empty in message
 				console("objectID: ");
 				int objectID = readConsoleInt();
 				int h = hash(objectID);
 				ArrayList<String> conn = checkConn(hash(h), hash(h + 1), hash(h + 2));
 				if (conn.size() >= 2) {
+					// PHASE-I
+					boolean commit = true;
 					Socket sockets[] = new Socket[conn.size()];
 					InsertMessage im = new InsertMessage();
 					im.sender = "CLIENT-" + id;
@@ -65,6 +82,27 @@ public class Client {
 					for (int i = 0; i < sockets.length; i++) {
 						String rawMessage = Commons.readFromSocket(sockets[i]);
 						ResponseMessage rm = ResponseMessage.getObjectFromString(rawMessage);
+						if (rm.status.equals(STATUS.ERROR)) {
+							commit = false;
+							Commons.log(rm.statusMessage, id, false);
+						}
+					}
+					for (int i = 0; i < sockets.length; i++)
+						sockets[i].close();
+					// PHASE-II
+					FinalMessage fm = new FinalMessage();
+					fm.PREV_OP = "INSERT";
+					fm.objectID = objectID;
+					fm.commit = commit;
+					for (int i = 0; i < sockets.length; i++)
+						sockets[i] = new Socket(conn.get(i), Constants.SERVER_PORT);
+					for (int i = 0; i < sockets.length; i++) {
+						fm.receiverAddress = conn.get(i);
+						Commons.writeToSocket(sockets[i], fm.toString());
+					}
+					for (int i = 0; i < sockets.length; i++) {
+						String rawMessage = Commons.readFromSocket(sockets[i]);
+						ResponseMessage rm = ResponseMessage.getObjectFromString(rawMessage);
 						Commons.log(rm.statusMessage, id, false);
 					}
 					for (int i = 0; i < sockets.length; i++)
@@ -75,14 +113,17 @@ public class Client {
 				}
 				break;
 
+			/*
+			 * Make UPDATEs to the existing object in the FileSystem
+			 */
 			case 'u':
-				// TODO Implement 2-phase commit
-				// TODO Receiver field empty in message
 				console("objectID: ");
 				objectID = readConsoleInt();
 				h = hash(objectID);
 				conn = checkConn(hash(h), hash(h + 1), hash(h + 2));
 				if (conn.size() >= 2) {
+					// PHASE-I
+					boolean commit = true;
 					Socket sockets[] = new Socket[conn.size()];
 					UpdateMessage um = new UpdateMessage();
 					um.sender = "CLIENT-" + id;
@@ -101,6 +142,27 @@ public class Client {
 					for (int i = 0; i < sockets.length; i++) {
 						String rawMessage = Commons.readFromSocket(sockets[i]);
 						ResponseMessage rm = ResponseMessage.getObjectFromString(rawMessage);
+						if (rm.status.equals(STATUS.ERROR)) {
+							commit = false;
+							Commons.log(rm.statusMessage, id, false);
+						}
+					}
+					for (int i = 0; i < sockets.length; i++)
+						sockets[i].close();
+					// PHASE-II
+					FinalMessage fm = new FinalMessage();
+					fm.PREV_OP = "UPDATE";
+					fm.objectID = objectID;
+					fm.commit = commit;
+					for (int i = 0; i < sockets.length; i++)
+						sockets[i] = new Socket(conn.get(i), Constants.SERVER_PORT);
+					for (int i = 0; i < sockets.length; i++) {
+						fm.receiverAddress = conn.get(i);
+						Commons.writeToSocket(sockets[i], fm.toString());
+					}
+					for (int i = 0; i < sockets.length; i++) {
+						String rawMessage = Commons.readFromSocket(sockets[i]);
+						ResponseMessage rm = ResponseMessage.getObjectFromString(rawMessage);
 						Commons.log(rm.statusMessage, id, false);
 					}
 					for (int i = 0; i < sockets.length; i++)
@@ -111,6 +173,9 @@ public class Client {
 				}
 				break;
 
+			/*
+			 * READ an object from the FileSystem
+			 */
 			case 'r':
 				console("objectID: ");
 				objectID = readConsoleInt();
@@ -154,6 +219,7 @@ public class Client {
 					break;
 				h = hash(objectID);
 				if (checkConn(hash(h)) & checkConn(hash(h + 1)) & checkConn(hash(h + 2))) {
+					boolean commit = true;
 					DeleteMessage dm = new DeleteMessage();
 					dm.sender = "CLIENT-" + id;
 					dm.senderAddress = InetAddress.getLocalHost().getHostAddress();
@@ -168,13 +234,36 @@ public class Client {
 					Commons.writeToSocket(server3, dm.toString());
 					rawMessage = Commons.readFromSocket(server1);
 					responseMessage = ResponseMessage.getObjectFromString(rawMessage);
+					if (responseMessage.status.equals(STATUS.ERROR))
+						commit = false;
 					Commons.log(responseMessage.statusMessage, id, false);
 					rawMessage = Commons.readFromSocket(server2);
 					responseMessage = ResponseMessage.getObjectFromString(rawMessage);
+					if (responseMessage.status.equals(STATUS.ERROR))
+						commit = false;
 					Commons.log(responseMessage.statusMessage, id, false);
 					rawMessage = Commons.readFromSocket(server3);
 					responseMessage = ResponseMessage.getObjectFromString(rawMessage);
+					if (responseMessage.status.equals(STATUS.ERROR))
+						commit = false;
 					Commons.log(responseMessage.statusMessage, id, false);
+					server1.close();
+					server2.close();
+					server3.close();
+					// PHASE-II
+					FinalMessage fm = new FinalMessage();
+					fm.PREV_OP = "DELETE";
+					fm.objectID = objectID;
+					fm.commit = commit;
+					server1 = new Socket(connect(hash(h)), Constants.SERVER_PORT);
+					server2 = new Socket(connect(hash(h + 1)), Constants.SERVER_PORT);
+					server3 = new Socket(connect(hash(h + 2)), Constants.SERVER_PORT);
+					Commons.writeToSocket(server1, fm.toString());
+					Commons.writeToSocket(server2, fm.toString());
+					Commons.writeToSocket(server3, fm.toString());
+					rawMessage = Commons.readFromSocket(server1);
+					rawMessage = Commons.readFromSocket(server2);
+					rawMessage = Commons.readFromSocket(server3);
 					server1.close();
 					server2.close();
 					server3.close();
@@ -186,8 +275,14 @@ public class Client {
 		}
 	}
 
+	/**
+	 * Checks if the client is able to connect to any server from given ids
+	 * @param SERVER-ID1
+	 * @param SERVER-ID2
+	 * @param SERVER-ID3
+	 * @return ArrayList of IP address of accessible servers
+	 */
 	private ArrayList<String> checkConn(int hash, int hash2, int hash3) {
-		// TODO Auto-generated method stub
 		ArrayList<String> conns = new ArrayList<>();
 		String conn;
 		Properties servers = Commons.loadProperties(Constants.CONNECTIONS_PATH + "client" + id);
@@ -200,29 +295,58 @@ public class Client {
 		return conns;
 	}
 
+	/**
+	 * Checks if client can connect to server with ID = serverID
+	 * @param serverID
+	 * @return IP address of server, null if not able to connect
+	 * @throws IOException
+	 */
 	private String connect(int serverID) throws IOException {
 		Properties servers = Commons.loadProperties(Constants.CONNECTIONS_PATH + "client" + id);
-		Commons.log("Server address: " + servers.getProperty("server" + serverID), id, false);
 		return servers.getProperty("server" + serverID);
 	}
 
+	/**
+	 * Checks if client can connect to server with ID = serverID
+	 * @param serverID
+	 * @return true if able to connect, otherwise false
+	 * @throws IOException
+	 */
 	private boolean checkConn(int serverID) throws IOException {
 		Properties servers = Commons.loadProperties(Constants.CONNECTIONS_PATH + "client" + id);
 		return servers.getProperty("server" + serverID) == null ? false : true;
 	}
 
+	/**
+	 * Computes the SERVER-ID from OBJECT-ID.
+	 * Uses mod to calculate hash
+	 * @param id - OBJECT-ID
+	 * @return
+	 */
 	private int hash(int id) {
 		return id % Constants.SERVER_NUMBER;
 	}
 
+	/**
+	 * Prints message as console prompt
+	 * @param message
+	 */
 	private void console(String message) {
 		System.out.print("client> " + message);
 	}
 
+	/**
+	 * Prints console prompt
+	 */
 	private void console() {
 		System.out.print("client> ");
 	}
 
+	/**
+	 * Reads from console till EOF
+	 * @return read text in String
+	 * @throws IOException
+	 */
 	private String readConsole() throws IOException {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		String contents = "";
@@ -232,12 +356,20 @@ public class Client {
 		return contents;
 	}
 
+	/**
+	 * Reads integer from console
+	 * @throws IOException
+	 */
 	private int readConsoleInt() throws IOException {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		int i = Integer.parseInt(br.readLine());
 		return i;
 	}
 
+	/**
+	 * Reads a single line from console
+	 * @throws IOException
+	 */
 	private String readLineConsole() throws IOException {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		String string = br.readLine();

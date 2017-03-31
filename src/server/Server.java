@@ -16,9 +16,9 @@ import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import messages.DeleteMessage;
+import messages.FinalMessage;
 import messages.InsertMessage;
 import messages.Message;
-import messages.ProbeMessage;
 import messages.ReadMessage;
 import messages.ResponseMessage;
 import messages.UpdateMessage;
@@ -27,6 +27,11 @@ import utils.Commons;
 import utils.Constants;
 import utils.MessageContainer;
 
+/**
+ * Server implementation of the FileSystem
+ * @author shriroop
+ *
+ */
 public class Server {
 
 	ServerSocket externalServer, internalServer;
@@ -48,15 +53,16 @@ public class Server {
 		}
 	}
 
+	/**
+	 * Starts server, reads message from InputQueue, processes it, and places results in OutputQueue
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
 	public void start() throws IOException, InterruptedException {
-		// TODO Auto-generated method stub
 		Commons.log("Server started on " + InetAddress.getLocalHost().getHostAddress() + ":" + Constants.SERVER_PORT,
 				id, true);
 		String address = InetAddress.getLocalHost().getHostAddress();
 		addToConnectionList(address, Constants.CONNECTIONS_PATH);
-		Thread serverThread = new Thread(new ServerThread());
-		serverThread.setName("InternalServerThread");
-		serverThread.start();
 		Thread receiverThread = new Thread(new ReceiverThread());
 		receiverThread.setName("ReceiverThread");
 		receiverThread.start();
@@ -165,23 +171,106 @@ public class Server {
 				MessageContainer resContainer = new MessageContainer(resMsg, container.getClient());
 				outQueue.put(resContainer);
 
+			} else if (msg instanceof FinalMessage) {
+				FinalMessage fm = (FinalMessage) msg;
+				boolean success = finalAction(fm);
+				ResponseMessage resMsg = new ResponseMessage();
+				if (success) {
+					Commons.log("COMMITTED at SERVER-" + id, id, true);
+					resMsg.status = STATUS.SUCCESS.toString();
+					resMsg.statusMessage = "COMMITTED";
+					resMsg.object = null;
+					resMsg.objectID = -1;
+				} else {
+					Commons.log("ABORTED at SERVER-" + id, id, true);
+					resMsg.status = STATUS.ERROR.toString();
+					resMsg.statusMessage = "ABORTED";
+					resMsg.object = null;
+					resMsg.objectID = -1;
+				}
+				resMsg.sender = "SERVER-" + id;
+				resMsg.senderAddress = InetAddress.getLocalHost().getHostAddress();
+				resMsg.receiver = fm.sender;
+				resMsg.receiverAddress = fm.senderAddress;
+				MessageContainer resContainer = new MessageContainer(resMsg, container.getClient());
+				outQueue.put(resContainer);
+
 			} else {
 				System.err.println("[ SERVER-" + id + "]: ERROR - Unknown Message received");
 			}
 		}
 	}
 
+	/**
+	 * Decides whether to commit or abort
+	 * @param fm
+	 * @return true if commit, otherwise false
+	 */
+	private boolean finalAction(FinalMessage fm) {
+		boolean ret = false;
+		switch (fm.PREV_OP) {
+		case "INSERT":
+			File f = new File(repo.getPath() + File.separator + "tmp." + fm.objectID);
+			if (fm.commit) {
+				ret = f.renameTo(new File(repo.getPath() + File.separator + fm.objectID));
+			} else {
+				ret = f.delete();
+			}
+			return ret;
+
+		case "UPDATE":
+			if (fm.commit) {
+				f = new File(repo.getPath() + File.separator + "tmp." + fm.objectID);
+				f.renameTo(new File(repo.getPath() + File.separator + fm.objectID));
+				f = new File(repo.getPath() + File.separator + "prev." + fm.objectID);
+				f.delete();
+				return true;
+			} else {
+				f = new File(repo.getPath() + File.separator + "prev." + fm.objectID);
+				f.renameTo(new File(repo.getPath() + File.separator + fm.objectID));
+				f = new File(repo.getPath() + File.separator + "tmp." + fm.objectID);
+				f.delete();
+				return true;
+			}
+
+		case "DELETE":
+			if (fm.commit) {
+				f = new File(repo.getPath() + File.separator + "tmp." + fm.objectID);
+				f.delete();
+				return true;
+			} else {
+				f = new File(repo.getPath() + File.separator + "tmp." + fm.objectID);
+				f.renameTo(new File(repo.getPath() + File.separator + fm.objectID));
+				return true;
+			}
+			
+		default:
+			return ret;
+		}
+	}
+
+	/**
+	 * Deletes object from filesystem
+	 * @param msg
+	 * @return true if success, otherwise false
+	 */
 	private boolean deleteObject(DeleteMessage msg) {
 		boolean deleted = true;
 		File[] files = repo.listFiles();
 		for (File file : files) {
 			if (file.getName().equals(msg.getObjectID() + "")) {
-				return file.delete();
+				return file.renameTo(new File(repo.getPath() + File.separator + "tmp." + msg.getObjectID()));
 			}
 		}
 		return deleted;
 	}
 
+	/**
+	 * Updates the Object in filesystem
+	 * @param msg
+	 * @return true if success, otherwise false
+	 * @throws IOException
+	 */
 	private boolean updateObject(UpdateMessage msg) throws IOException {
 		boolean updated = false;
 		RepoObject obj = null;
@@ -200,13 +289,22 @@ public class Server {
 		if (obj == null)
 			return updated;
 		OutputStreamWriter osw = new OutputStreamWriter(
-				new FileOutputStream(repo.getPath() + File.separator + msg.getObjectID()));
+				new FileOutputStream(repo.getPath() + File.separator + "tmp." + msg.getObjectID()));
 		osw.write(msg.newObject + "\n");
 		osw.close();
+		File f = new File(repo.getPath() + File.separator + msg.getObjectID());
+		f.renameTo(new File(repo.getPath() + File.separator + "prev." + msg.getObjectID()));
+		f.delete();
 		updated = true;
 		return updated;
 	}
 
+	/**
+	 * Writes an object to the filesystem
+	 * @param msg
+	 * @return true if written, false otherwise
+	 * @throws IOException
+	 */
 	private boolean insertObject(InsertMessage msg) throws IOException {
 		boolean inserted = false;
 		File[] files = repo.listFiles();
@@ -216,7 +314,7 @@ public class Server {
 					return inserted;
 			}
 		}
-		File f = new File(repo.getPath() + File.separator + msg.getObjectID());
+		File f = new File(repo.getPath() + File.separator + "tmp." + msg.getObjectID());
 		f.createNewFile();
 		OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(f));
 		RepoObject o = RepoObject.getObjectFromString(msg.object);
@@ -228,6 +326,12 @@ public class Server {
 		return inserted;
 	}
 
+	/**
+	 * Reads object from the filesystem
+	 * @param msg
+	 * @return object
+	 * @throws IOException
+	 */
 	private RepoObject readObject(ReadMessage msg) throws IOException {
 		RepoObject obj = null;
 		int id = msg.getObjectID();
@@ -246,6 +350,12 @@ public class Server {
 		return obj;
 	}
 
+	/**
+	 * adds the IP address to list of connections for each client
+	 * @param address
+	 * @param filename
+	 * @throws IOException
+	 */
 	private void addToConnectionList(String address, String filename) throws IOException {
 		for (int i = 0; i < Constants.CLIENT_NUMBER; i++) {
 			Properties props = new Properties();
@@ -277,6 +387,11 @@ public class Server {
 		}
 	}
 
+	/**
+	 * Receives the incoming messages and places it in InputQueue
+	 * @author shriroop
+	 *
+	 */
 	private class ReceiverThread implements Runnable {
 
 		@Override
@@ -300,6 +415,9 @@ public class Server {
 					} else if (rawMessage.contains("DeleteMessage")) {
 						DeleteMessage dm = DeleteMessage.getObjectFromString(rawMessage);
 						inQueue.put(new MessageContainer(dm, client));
+					} else if (rawMessage.contains("FinalMessage")) {
+						FinalMessage fm = FinalMessage.getObjectFromString(rawMessage);
+						inQueue.put(new MessageContainer(fm, client));
 					} else {
 						System.err.println("[ SERVER- " + id + "]: ERROR - Unknown Message received");
 					}
@@ -310,6 +428,11 @@ public class Server {
 		}
 	}
 
+	/**
+	 * Reads the messages from OutputQueue and sends them
+	 * @author shriroop
+	 *
+	 */
 	private class SenderThread implements Runnable {
 
 		@Override
@@ -323,41 +446,5 @@ public class Server {
 				}
 			}
 		}
-	}
-
-	private class ServerThread implements Runnable {
-
-		@Override
-		public void run() {
-			// TODO Auto-generated method stub
-			try {
-				String STATUS = "NOT_FOUND";
-				String contents = "";
-				Socket server = internalServer.accept();
-				String rawMessage = Commons.readFromSocket(server);
-				ProbeMessage pm = ProbeMessage.getObjectFromString(rawMessage);
-				RepoObject obj = RepoObject.getObjectFromString(pm.object);
-				File[] files = repo.listFiles();
-				if (files != null && files.length != 0) {
-					for (File file : files) {
-						if (file.getName().equals(obj.getId() + "")) {
-							STATUS = "FOUND";
-							contents = new String(Files.readAllBytes(file.toPath()));
-							break;
-						}
-					}
-				}
-				if (STATUS.equals("FOUND")) {
-					RepoObject newObj = RepoObject.getObjectFromString(contents);
-					if (newObj.version > obj.version) {
-						pm.object = newObj.toString();
-					}
-				}
-				Commons.writeToSocket(server, pm.toString());
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-
 	}
 }
